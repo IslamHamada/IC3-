@@ -1,0 +1,12 @@
+
+.idea/
+
+aag_test/
+
+aiger/
+
+cmake-build-debug/
+
+minisat/
+
+my_smv/
