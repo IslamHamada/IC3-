@@ -578,8 +578,9 @@ bool IC3::handleObligations(PriorityQueue obls) {
         LitVec core;
         size_t predi;
         // Is the obligation fulfilled?
-        if (consecution(obl.level, state(obl.state).latches, obl.state,
-                        &core, &predi)) {
+        assert(state(obl.state).latches.size() > 0);
+        bool obligation_fulfilled = consecution(obl.level, state(obl.state).latches, obl.state, &core, &predi);
+        if (obligation_fulfilled) {
             // Yes, so generalize and possibly produce a new obligation
             // at a higher level.
             obls.erase(obli);
