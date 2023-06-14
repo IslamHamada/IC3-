@@ -766,3 +766,148 @@ bool IC3::strengthen_extra(size_t frame_idx) {
     return change;
 }
 
+bool IC3::correctness() {
+    int first_empty_frame = 0;
+    for (int i = 1; i < frames.size(); i++) {
+        if (frames[i].borderCubes.size() == 0) {
+            first_empty_frame = i;
+            break;
+        }
+    }
+//        cout << "First empty frame index: " << first_empty_frame << endl;
+    Minisat::Solver *correctness_checker = model.newSolver();
+    for (int i = first_empty_frame + 1; i < frames.size(); i++) {
+        for (LitVec cube: frames[i].borderCubes) {
+            Minisat::vec<Minisat::Lit> cls;
+            for (int k = 0; k < cube.size(); k++) {
+                cls.push(~cube[k]);
+            }
+            correctness_checker->addClause_(cls);
+        }
+    }
+    model.loadTransitionRelation(*correctness_checker);
+    bool bad_state_is_reachable = correctness_checker->solve(model.primedError());
+    cout << "No reachable bad state: " << !bad_state_is_reachable << endl;
+
+    bool inductive = true;
+    for (int i = first_empty_frame + 1; i < frames.size(); i++) {
+        for (LitVec cube: frames[i].borderCubes) {
+            MSLitVec assumps;
+            for (int k = 0; k < cube.size(); k++) {
+                assumps.push(model.primeLit(cube[k]));
+            }
+            inductive = inductive && !(correctness_checker->solve(assumps));
+        }
+    }
+    cout << "Inductive: " << inductive << endl;
+
+    bool frames_are_correct = has_correct_frames(first_empty_frame);
+
+    cout << "Frames are overapproximating reachable states: " << frames_are_correct << endl;
+    return inductive && !bad_state_is_reachable & frames_are_correct;
+}
+
+bool IC3::has_correct_frames(int first_empty_frame) {
+    LitVec initial_state = model.init;
+    Minisat::Lit error = model.error();
+    AigVec ands = model.aig;
+//        unordered_map<int, int> primed;
+    int num_of_vars = model.primes - 1;
+
+    for(int i = 1; i < first_empty_frame; i++){
+        Minisat::Solver* s = new Minisat::Solver();
+
+        for (size_t j = 0; j <= num_of_vars * (i + 1) + 1; ++j) {
+            s->newVar();
+        }
+
+        s->addClause(Minisat::mkLit(0, true));
+
+        for(Minisat::Lit l : initial_state){
+            s->addClause(l);
+        }
+
+        load_k_unrollings_of_the_transition_relation(*s, i, num_of_vars, ands);
+
+        int total_cubes = 0;
+        CubeSet all_cubes;
+        for(int j = i; j < frames.size(); j++){
+            total_cubes += frames[j].borderCubes.size();
+            all_cubes.insert(frames[j].borderCubes.begin(), frames[j].borderCubes.end());
+        }
+        LitVec clauses_lits(total_cubes);
+        MSLitVec cls1;
+        Minisat::Lit act = Minisat::mkLit(s->newVar());
+        cls1.push(~act);
+        int m = 0;
+        for (set<LitVec>::iterator it = all_cubes.begin(); it != all_cubes.end(); it++, m++) {
+            clauses_lits[m] = Minisat::mkLit(s->newVar());
+            cls1.push(clauses_lits[m]);
+            s->addClause(~clauses_lits[m], act);
+
+            MSLitVec cls2;
+            cls2.push(clauses_lits[m]);
+            for (Minisat::Lit l: *it) {
+                cls2.push(~prime(l, i, num_of_vars));
+                s->addClause(~clauses_lits[m], prime(l, i, num_of_vars));
+            }
+            s->addClause_(cls2);
+        }
+        s->addClause(cls1);
+        s->addClause(act);
+
+        bool rv = s->solve();
+        delete s;
+        if(rv) return false;
+        cout << "frame" << i << " is correct" << endl;
+    }
+    return true;
+}
+
+void
+IC3::load_k_unrollings_of_the_transition_relation(Minisat::Solver &solver, int k, int num_of_vars, AigVec ands) {
+    // introduce all variables to maintain alignment
+
+
+    //ToDo: I don't handle constraints yet
+//        for (LitVec::const_iterator i = constraints.begin();
+//             i != constraints.end(); ++i) {
+//            Var v = varOfLit(*i);
+//            sslv->setFrozen(v.var(), true);
+//            sslv->setFrozen(primeVar(v).var(), true);
+//        }
+
+    for(int j = 0; j < k; j++) {
+        for (AigVec::iterator i = ands.begin(); i != ands.end(); ++i) {
+            // encode into CNF
+            solver.addClause(~prime(i->lhs, j, num_of_vars), prime(i->rhs0, j, num_of_vars));
+            solver.addClause(~prime(i->lhs, j, num_of_vars), prime(i->rhs1, j, num_of_vars));
+            solver.addClause(~prime(i->rhs0, j, num_of_vars), ~prime(i->rhs1, j, num_of_vars), prime(i->lhs, j, num_of_vars));
+
+//                solver.addClause(~prime(i->lhs, j+1, num_of_vars), prime(i->rhs0, j+1, num_of_vars));
+//                solver.addClause(~prime(i->lhs, j+1, num_of_vars), prime(i->rhs1, j+1, num_of_vars));
+//                solver.addClause(~prime(i->rhs0, j+1, num_of_vars), ~prime(i->rhs1, k, num_of_vars), prime(i->lhs, k, num_of_vars));
+
+        }
+//                if(j != k) {
+        for (VarVec::const_iterator i = model.beginLatches(); i != model.endLatches(); ++i) {
+            Minisat::Lit l1 = prime(Minisat::mkLit(i->index(), 0), j + 1, num_of_vars);
+            Minisat::Lit l2 = prime(model.nextStateFn(*i), j, num_of_vars);
+            solver.addClause(~l2, l1);
+            solver.addClause(~l1, l2);
+        }
+//            }
+    }
+
+    //ToDo: I don't handle constraints yet
+//        for (LitVec::const_iterator i = constraints.begin();
+//             i != constraints.end(); ++i) {
+//            sslv->addClause(*i);
+//        }
+}
+
+Minisat::Lit IC3::prime(Minisat::Lit lit, int k, int vars) {
+    if(lit.x < 2)
+        return lit;
+    return Minisat::mkLit(lit.x / 2 + k * vars, lit.x % 2);
+}

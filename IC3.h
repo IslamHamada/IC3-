@@ -244,6 +244,13 @@ public:
     bool strengthen_extra(size_t frame_idx);
 
     void add_extra_bad_state(idxLitVec idxCube);
+    bool correctness();
+
+    bool has_correct_frames(int first_empty_frame);
+
+    void load_k_unrollings_of_the_transition_relation(Minisat::Solver &solver, int k, int num_of_vars, AigVec ands);
+
+    Minisat::Lit prime(Minisat::Lit lit, int k, int vars);
 };
 
 bool check(Model &model,
