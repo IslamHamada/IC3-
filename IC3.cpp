@@ -620,7 +620,7 @@ bool IC3::strengthen() {
         if (!handleObligations(pq))
             return false;
         // finished with States for this iteration, so clean up
-        resetStates();
+//        resetStates();
     }
 }
 
