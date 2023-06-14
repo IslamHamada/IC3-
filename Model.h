@@ -233,7 +233,7 @@ public:
         return vars;
     }
 
-private:
+public:
     VarVec vars;
     const size_t inputs, latches, reps, primes;
 
