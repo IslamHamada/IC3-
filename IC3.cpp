@@ -288,12 +288,16 @@ size_t IC3::stateOf(Frame &fr, size_t succ, LitVec *succ_cube) {
     Minisat::vec<Minisat::Lit> cls;
     cls.push(~act);
     cls.push(notInvConstraints);  // successor must satisfy inv. constraint
-    if (succ == 0)
+    if (succ == 0 && succ_cube == NULL)
         cls.push(~model.primedError());
-    else
+    else if (succ == 0 && succ_cube != NULL){
+        for (Minisat::Lit l: *succ_cube)
+            cls.push(~l);
+    } else {
         for (LitVec::const_iterator i = state(succ).latches.begin();
              i != state(succ).latches.end(); ++i)
             cls.push(model.primeLit(~*i));
+    }
     lifts->addClause_(cls);
     // extract and assert primary inputs
     for (VarVec::const_iterator i = model.beginInputs();
