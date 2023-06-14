@@ -342,6 +342,17 @@ size_t IC3::stateOf(Frame &fr, size_t succ, LitVec *succ_cube) {
     for (LitVec::const_iterator i = latches.begin(); i != latches.end(); ++i)
         if (lifts->conflict.has(~*i))
             state(st).latches.push_back(*i);  // record lifted latches
+
+    if(state(st).latches.size() == 0){
+//        cout << "ops" << endl;
+        for (VarVec::const_iterator i = model.beginLatches(); i != model.endLatches(); ++i) {
+            Minisat::lbool val = fr.consecution->modelValue(i->var());
+            if (val != Minisat::l_Undef) {
+                Minisat::Lit la = i->lit(val == Minisat::l_False);
+                state(st).latches.push_back(la);
+            }
+        }
+    }
     // deactivate negation of successor
     lifts->releaseVar(~act);
     return st;
