@@ -42,6 +42,8 @@ extern "C" {
 // have std:: all over the place.
 using namespace std;
 
+typedef Minisat::Lit Lit;
+
 // A row of the AIGER spec: lhs = rhs0 & rhs1.
 struct AigRow {
     AigRow(Minisat::Lit _lhs, Minisat::Lit _rhs0, Minisat::Lit _rhs1) :
