@@ -251,6 +251,7 @@ public:
     void load_k_unrollings_of_the_transition_relation(Minisat::Solver &solver, int k, int num_of_vars, AigVec ands);
 
     Minisat::Lit prime(Minisat::Lit lit, int k, int vars);
+    size_t stateOfInc(size_t old_state);
 };
 
 bool check(Model &model,
