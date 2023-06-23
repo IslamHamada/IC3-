@@ -356,6 +356,17 @@ size_t IC3::stateOf(Frame &fr, size_t succ, LitVec *succ_cube) {
     // deactivate negation of successor
     lifts->releaseVar(~act);
     return st;
+    size_t st2 = st;
+    if (optimal) {
+        st2 = stateOfInc(st);
+        if (state(st2).latches.size() == 0) return st;
+        while (state(st2).latches.size() < state(st).latches.size()) {
+            st = st2;
+            size_t st2 = stateOfInc(st);
+            if (state(st2).latches.size() == 0) return st;
+        }
+    }
+    return st2;
 }
 
 // Checks if cube contains any initial states.
